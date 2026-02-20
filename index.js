@@ -1,49 +1,52 @@
-const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 const { QuickDB } = require("quick.db");
 
 const db = new QuickDB();
 const app = express();
-const TOKEN = process.env.TOKEN;
-const CLIENT_ID = '1338040792350199849'; // <--- PUT YOUR BOT ID HERE
 
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
-// --- API FOR MOD MENU ---
 app.post('/verify', async (req, res) => {
-    try {
-        const { key, hwid } = req.body;
-        const keyData = await db.get(`key_${key}`);
+    console.log("Received verification request:", req.body);
+    const { key, hwid } = req.body;
+    
+    if (!key) return res.send("INVALID");
 
-        if (!keyData) return res.send("INVALID");
-        if (!keyData.hwid) {
-            await db.set(`key_${key}`, { ...keyData, hwid: hwid });
-            return res.send("SUCCESS");
-        }
-        if (keyData.hwid === hwid) return res.send("SUCCESS");
-        return res.send("HWID_MISMATCH");
-    } catch (err) {
-        res.send("SERVER_ERROR");
+    const keyData = await db.get(`key_${key}`);
+    if (!keyData) return res.send("INVALID");
+
+    if (!keyData.hwid) {
+        await db.set(`key_${key}`, { ...keyData, hwid: hwid });
+        return res.send("SUCCESS");
+    }
+
+    if (keyData.hwid === hwid) return res.send("SUCCESS");
+    
+    return res.send("HWID_MISMATCH");
+});
+
+app.get('/', (req, res) => { res.send("API is Online!"); });
+
+// DISCORD BOT PART
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+
+client.on('ready', () => {
+    console.log(`Bot logged in as ${client.user.tag}`);
+});
+
+client.on('messageCreate', async (message) => {
+    if (message.content === '!gen') {
+        const newKey = "GT-" + Math.random().toString(36).substring(2, 10).toUpperCase();
+        await db.set(`key_${newKey}`, { hwid: null });
+        message.reply(`Key generated: \`${newKey}\``);
     }
 });
 
-// --- DISCORD BOT ---
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
-client.on('ready', () => {
-    console.log(`Logged in as ${client.user.tag}!`);
-});
-
-// Basic error handling to prevent crash
-client.on('error', console.error);
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`API is running on port ${PORT}`);
+    console.log(`Server is listening on port ${PORT}`);
 });
 
-if (TOKEN) {
-    client.login(TOKEN).catch(console.error);
-} else {
-    console.log("ERROR: No TOKEN found in Environment Variables!");
-}
+client.login(process.env.TOKEN).catch(err => console.log("Discord Login Error: " + err));
