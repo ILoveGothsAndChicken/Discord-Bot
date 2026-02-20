@@ -10,22 +10,27 @@ app.use(express.json());
 
 // --- API FOR MOD MENU ---
 app.post('/verify', async (req, res) => {
-    console.log("Received verification request:", req.body);
     const { key, hwid } = req.body;
     
-    if (!key) return res.send("INVALID");
+    // 1. Check if key OR hwid are missing/empty
+    if (!key || !hwid) {
+        return res.send("INVALID_REQUEST"); 
+    }
 
     const keyData = await db.get(`key_${key}`);
-    if (!keyData) return res.send("INVALID");
+    if (!keyData) return res.send("INVALID_KEY");
 
-    // If key has no HWID, lock it to this one
+    // 2. If the key is fresh (no HWID assigned yet)
     if (!keyData.hwid) {
         await db.set(`key_${key}`, { ...keyData, hwid: hwid });
+        console.log(`Key ${key} locked to HWID: ${hwid}`);
         return res.send("SUCCESS");
     }
 
-    // Compare stored HWID with current HWID
-    if (keyData.hwid === hwid) return res.send("SUCCESS");
+    // 3. Strict comparison
+    if (keyData.hwid === hwid) {
+        return res.send("SUCCESS");
+    }
     
     return res.send("HWID_MISMATCH");
 });
@@ -60,3 +65,4 @@ app.listen(PORT, () => {
 });
 
 client.login(process.env.TOKEN).catch(err => console.log("Discord Login Error: " + err));
+
