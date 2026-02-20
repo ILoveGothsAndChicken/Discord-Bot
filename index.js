@@ -18,11 +18,13 @@ app.post('/verify', async (req, res) => {
     const keyData = await db.get(`key_${key}`);
     if (!keyData) return res.send("INVALID");
 
+    // If key has no HWID, lock it to this one
     if (!keyData.hwid) {
         await db.set(`key_${key}`, { ...keyData, hwid: hwid });
         return res.send("SUCCESS");
     }
 
+    // Compare stored HWID with current HWID
     if (keyData.hwid === hwid) return res.send("SUCCESS");
     
     return res.send("HWID_MISMATCH");
@@ -44,6 +46,7 @@ client.on('ready', () => {
 });
 
 client.on('messageCreate', async (message) => {
+    // Command to generate keys: !gen
     if (message.content === '!gen') {
         const newKey = "GT-" + Math.random().toString(36).substring(2, 10).toUpperCase();
         await db.set(`key_${newKey}`, { hwid: null });
