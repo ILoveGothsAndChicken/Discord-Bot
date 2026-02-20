@@ -8,6 +8,7 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// --- API FOR MOD MENU ---
 app.post('/verify', async (req, res) => {
     console.log("Received verification request:", req.body);
     const { key, hwid } = req.body;
@@ -29,8 +30,14 @@ app.post('/verify', async (req, res) => {
 
 app.get('/', (req, res) => { res.send("API is Online!"); });
 
-// DISCORD BOT PART
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+// --- DISCORD BOT ---
+const client = new Client({ 
+    intents: [
+        GatewayIntentBits.Guilds, 
+        GatewayIntentBits.GuildMessages, 
+        GatewayIntentBits.MessageContent
+    ] 
+});
 
 client.on('ready', () => {
     console.log(`Bot logged in as ${client.user.tag}`);
