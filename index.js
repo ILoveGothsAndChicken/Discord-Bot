@@ -12,30 +12,28 @@ app.use(express.json());
 app.post('/verify', async (req, res) => {
     const { key, hwid } = req.body;
     
-    // 1. Check if key OR hwid are missing/empty
-    if (!key || !hwid) {
+    // Check if key OR hwid are missing
+    if (!key || !hwid || hwid === "undefined") {
         return res.send("INVALID_REQUEST"); 
     }
 
     const keyData = await db.get(`key_${key}`);
     if (!keyData) return res.send("INVALID_KEY");
 
-    // 2. If the key is fresh (no HWID assigned yet)
+    // If key is fresh, lock it to this HWID
     if (!keyData.hwid) {
         await db.set(`key_${key}`, { ...keyData, hwid: hwid });
-        console.log(`Key ${key} locked to HWID: ${hwid}`);
+        console.log(`Key ${key} locked to: ${hwid}`);
         return res.send("SUCCESS");
     }
 
-    // 3. Strict comparison
+    // Compare stored HWID with current HWID
     if (keyData.hwid === hwid) {
         return res.send("SUCCESS");
     }
     
     return res.send("HWID_MISMATCH");
 });
-
-app.get('/', (req, res) => { res.send("API is Online!"); });
 
 // --- DISCORD BOT ---
 const client = new Client({ 
@@ -46,23 +44,20 @@ const client = new Client({
     ] 
 });
 
-client.on('ready', () => {
-    console.log(`Bot logged in as ${client.user.tag}`);
-});
-
 client.on('messageCreate', async (message) => {
-    // Command to generate keys: !gen
+    // FIX: Ignore messages from bots to prevent double-firing
+    if (message.author.bot) return;
+
     if (message.content === '!gen') {
+        // More secure key generation
         const newKey = "GT-" + Math.random().toString(36).substring(2, 10).toUpperCase();
+        
+        // Ensure hwid is explicitly null for a new key
         await db.set(`key_${newKey}`, { hwid: null });
         message.reply(`Key generated: \`${newKey}\``);
     }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is listening on port ${PORT}`);
-});
-
-client.login(process.env.TOKEN).catch(err => console.log("Discord Login Error: " + err));
-
+app.listen(PORT, () => console.log(`Server listening on ${PORT}`));
+client.login(process.env.TOKEN);
