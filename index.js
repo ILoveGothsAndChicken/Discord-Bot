@@ -43,4 +43,5 @@ client.on('interactionCreate', async interaction => {
 
 const PORT = 3000;
 app.listen(PORT, () => console.log(`API is live at: http://localhost:${PORT}/verify`));
-client.login('YOUR_DISCORD_BOT_TOKEN');
+
+client.login('MTM3MTMwMzUxMDQ2MDczMTQ4Mw.GFMNZi.M-86dg3qlb9b1K1bvgoDTOB3ipqOUnkv_Qqsio');
