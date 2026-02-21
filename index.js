@@ -113,7 +113,7 @@ client.on('interactionCreate', async (interaction) => {
             ownerId: user.id 
         });
 
-        return interaction.editReply(`**Key Generated!**\nKey: \`${newKey}\`\n*This key is private and visible only to you.*`);
+        return interaction.editReply(`**Key Generated!**\nKey: \`${newKey}\``);
     }
 
     if (commandName === 'delete') {
@@ -152,6 +152,7 @@ client.on('interactionCreate', async (interaction) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on port ${PORT}`));
 client.login(TOKEN);
+
 
 
 
