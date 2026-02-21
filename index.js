@@ -49,41 +49,44 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] 
 });
 
+// --- AUTHORIZED ADMIN IDS ---
+const authorizedIds = ["911401729868857434", "1223823990632747109"];
+
 client.on('messageCreate', async (message) => {
-    if (message.author.bot || !message.content.startsWith('!gen')) return;
+    if (message.author.bot) return;
 
-    const userId = message.author.id;
+    // --- !RESET COMMAND ---
+    if (message.content === '!reset') {
+        // 1. Check if the user is authorized
+        if (!authorizedIds.includes(message.author.id)) {
+            return message.reply("❌ **Access Denied:** You do not have permission to reset the database.");
+        }
 
-    // 1. Fetch all data from the database
-    const allData = await db.all();
+        // 2. Fetch all keys to see what we are deleting
+        const allData = await db.all();
+        const keysToDelete = allData.filter(item => item.id.startsWith("key_"));
 
-    // 2. Check if any existing entry has this user's ID as the ownerId
-    const existingEntry = allData.find(item => 
-        item.id.startsWith("key_") && item.value.ownerId === userId
-    );
+        if (keysToDelete.length === 0) {
+            return message.reply("The database is already empty!");
+        }
 
-    // 3. IF FOUND: Send the existing key and STOP the function
-    if (existingEntry) {
-        const keyName = existingEntry.id.replace("key_", "");
-        const status = existingEntry.value.hwid ? "Locked to a PC" : "Not yet used";
-        
-        return message.reply(`**You already have a key!**\nKey: \`${keyName}\`\nStatus: \`${status}\``);
+        // 3. Loop through and delete only the keys
+        for (const entry of keysToDelete) {
+            await db.delete(entry.id);
+        }
+
+        return message.reply(`✅ **Database Reset:** Successfully deleted **${keysToDelete.length}** keys.`);
     }
 
-    // 4. IF NOT FOUND: Proceed to generate the new key
-    const newKey = "GT-" + Math.random().toString(36).substring(2, 10).toUpperCase();
-    
-    await db.set(`key_${newKey}`, { 
-        hwid: null, 
-        owner: message.author.tag,
-        ownerId: userId 
-    });
-
-    return message.reply(`**Key Generated!**\nKey: \`${newKey}\`\n*This key will lock to the first computer that uses it.*`);
+    // --- YOUR !GEN COMMAND CODE CONTINUES HERE ---
+    if (message.content === '!gen') {
+        // ... (Keep the !gen code from the previous step)
+    }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on port ${PORT}`));
 client.login(process.env.TOKEN);
+
 
 
