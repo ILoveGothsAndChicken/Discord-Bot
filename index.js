@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const express = require('express');
 const { QuickDB } = require("quick.db");
 
@@ -48,7 +48,7 @@ app.post('/verify', async (req, res) => {
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-client.on('ready', async () => {
+client.on('clientReady', async () => {
     console.log(`Logged in as ${client.user.tag}`);
 
     const commands = [
@@ -89,12 +89,12 @@ client.on('interactionCreate', async (interaction) => {
     if (!hasRole && !isAuthorized) {
         return interaction.reply({ 
             content: "❌ **Access Denied:** You do not have the required role to use this bot.", 
-            ephemeral: true 
+            flags: [64]
         });
     }
 
     if (commandName === 'gen') {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: [64] });
 
         const allData = await db.all();
         const existingEntry = allData.find(item => 
@@ -103,6 +103,7 @@ client.on('interactionCreate', async (interaction) => {
 
         if (existingEntry) {
             const keyName = existingEntry.id.replace("key_", "");
+            const status = existingEntry.value.hwid ? "Locked" : "Available";
             return interaction.editReply(`**You already have a key!**\nKey: \`${keyName}\`\nStatus: \`${status}\``);
         }
 
@@ -118,7 +119,7 @@ client.on('interactionCreate', async (interaction) => {
 
     if (commandName === 'delete') {
         if (!isAuthorized) {
-            return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
+            return interaction.reply({ content: "❌ **Access Denied.**", flags: [64] });
         }
 
         const keyToDelete = options.getString('key');
@@ -126,16 +127,16 @@ client.on('interactionCreate', async (interaction) => {
         
         const exists = await db.get(dbKey);
         if (!exists) {
-            return interaction.reply({ content: `❌ Key \`${keyToDelete}\` not found in database.`, ephemeral: true });
+            return interaction.reply({ content: `❌ Key \`${keyToDelete}\` not found in database.`, flags: [64] });
         }
 
         await db.delete(dbKey);
-        return interaction.reply({ content: `✅ Successfully deleted key: \`${keyToDelete}\``, ephemeral: true });
+        return interaction.reply({ content: `✅ Successfully deleted key: \`${keyToDelete}\``, flags: [64] });
     }
 
     if (commandName === 'reset') {
         if (!isAuthorized) {
-            return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
+            return interaction.reply({ content: "❌ **Access Denied.**", flags: [64] });
         }
 
         const allData = await db.all();
@@ -145,15 +146,10 @@ client.on('interactionCreate', async (interaction) => {
             await db.delete(entry.id);
         }
 
-        return interaction.reply({ content: `✅ Deleted **${keysToDelete.length}** keys.`, ephemeral: true });
+        return interaction.reply({ content: `✅ Deleted **${keysToDelete.length}** keys.`, flags: [64] });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on port ${PORT}`));
 client.login(TOKEN);
-
-
-
-
-
