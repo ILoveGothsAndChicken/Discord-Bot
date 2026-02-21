@@ -11,7 +11,6 @@ app.use(express.json());
 const TOKEN = process.env.TOKEN;
 const AUTHORIZED_IDS = ["911401729868857434", "1223823990632747109"];
 const REQUIRED_ROLE_ID = "1340792386044956715";
-const ALLOWED_CHANNEL_ID = "1474566621644455938";
 
 app.post('/verify', async (req, res) => {
     const { key, hwid } = req.body;
@@ -82,7 +81,17 @@ client.on('ready', async () => {
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
-    const { commandName, user, options } = interaction;
+    const { commandName, user, options, member } = interaction;
+
+    const hasRole = member.roles.cache.has(REQUIRED_ROLE_ID);
+    const isAuthorized = AUTHORIZED_IDS.includes(user.id);
+
+    if (!hasRole && !isAuthorized) {
+        return interaction.reply({ 
+            content: "❌ **Access Denied:** You do not have the required role to use this bot.", 
+            ephemeral: true 
+        });
+    }
 
     if (commandName === 'gen') {
         await interaction.deferReply({ ephemeral: true });
@@ -109,7 +118,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (commandName === 'delete') {
-        if (!AUTHORIZED_IDS.includes(user.id)) {
+        if (!isAuthorized) {
             return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
         }
 
@@ -126,7 +135,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (commandName === 'reset') {
-        if (!AUTHORIZED_IDS.includes(user.id)) {
+        if (!isAuthorized) {
             return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
         }
 
@@ -144,4 +153,3 @@ client.on('interactionCreate', async (interaction) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on port ${PORT}`));
 client.login(TOKEN);
-
