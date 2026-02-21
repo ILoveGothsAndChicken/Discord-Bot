@@ -12,6 +12,7 @@ const TOKEN = process.env.TOKEN;
 const AUTHORIZED_IDS = ["911401729868857434", "1223823990632747109"];
 const REQUIRED_ROLE_ID = "1340792386044956715";
 
+// --- EXPRESS API ---
 app.post('/verify', async (req, res) => {
     const { key, hwid } = req.body;
     
@@ -46,9 +47,11 @@ app.post('/verify', async (req, res) => {
     return res.send("HWID_MISMATCH");
 });
 
+// --- DISCORD BOT ---
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-client.on('clientReady', async () => {
+// FIXED: Changed 'clientReady' to 'ready'
+client.on('ready', async () => {
     console.log(`Logged in as ${client.user.tag}`);
 
     const commands = [
@@ -74,7 +77,7 @@ client.on('clientReady', async () => {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
         console.log('Successfully reloaded application (/) commands.');
     } catch (error) {
-        console.error(error);
+        console.error('Error registering commands:', error);
     }
 });
 
@@ -83,18 +86,19 @@ client.on('interactionCreate', async (interaction) => {
 
     const { commandName, user, options, member } = interaction;
 
+    // Check if user has the role or is an authorized admin
     const hasRole = member.roles.cache.has(REQUIRED_ROLE_ID);
     const isAuthorized = AUTHORIZED_IDS.includes(user.id);
 
     if (!hasRole && !isAuthorized) {
         return interaction.reply({ 
             content: "❌ **Access Denied:** You do not have the required role to use this bot.", 
-            flags: [64]
+            ephemeral: true 
         });
     }
 
     if (commandName === 'gen') {
-        await interaction.deferReply({ flags: [64] });
+        await interaction.deferReply({ ephemeral: true });
 
         const allData = await db.all();
         const existingEntry = allData.find(item => 
@@ -119,7 +123,7 @@ client.on('interactionCreate', async (interaction) => {
 
     if (commandName === 'delete') {
         if (!isAuthorized) {
-            return interaction.reply({ content: "❌ **Access Denied.**", flags: [64] });
+            return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
         }
 
         const keyToDelete = options.getString('key');
@@ -127,16 +131,16 @@ client.on('interactionCreate', async (interaction) => {
         
         const exists = await db.get(dbKey);
         if (!exists) {
-            return interaction.reply({ content: `❌ Key \`${keyToDelete}\` not found in database.`, flags: [64] });
+            return interaction.reply({ content: `❌ Key \`${keyToDelete}\` not found in database.`, ephemeral: true });
         }
 
         await db.delete(dbKey);
-        return interaction.reply({ content: `✅ Successfully deleted key: \`${keyToDelete}\``, flags: [64] });
+        return interaction.reply({ content: `✅ Successfully deleted key: \`${keyToDelete}\``, ephemeral: true });
     }
 
     if (commandName === 'reset') {
         if (!isAuthorized) {
-            return interaction.reply({ content: "❌ **Access Denied.**", flags: [64] });
+            return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
         }
 
         const allData = await db.all();
@@ -146,10 +150,16 @@ client.on('interactionCreate', async (interaction) => {
             await db.delete(entry.id);
         }
 
-        return interaction.reply({ content: `✅ Deleted **${keysToDelete.length}** keys.`, flags: [64] });
+        return interaction.reply({ content: `✅ Deleted **${keysToDelete.length}** keys.`, ephemeral: true });
     }
 });
 
+// Global error handling to prevent "Unhandled Error" crashes
+client.on('error', console.error);
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on port ${PORT}`));
-client.login(TOKEN);
+
+client.login(TOKEN).catch(err => {
+    console.error("Failed to login to Discord:", err);
+});
