@@ -55,14 +55,25 @@ client.on('ready', async () => {
 
     // Register Slash Commands
     const commands = [
-        new SlashCommandBuilder().setName('gen').setDescription('Generate your private HWID key'),
-        new SlashCommandBuilder().setName('reset').setDescription('Admin only: Clear all keys from database'),
+        new SlashCommandBuilder()
+            .setName('gen')
+            .setDescription('Generate your private HWID key'),
+        new SlashCommandBuilder()
+            .setName('reset')
+            .setDescription('Admin only: Clear all keys from database'),
+        new SlashCommandBuilder()
+            .setName('delete')
+            .setDescription('Admin only: Delete a specific key')
+            .addStringOption(option => 
+                option.setName('key')
+                .setDescription('The full key to delete (e.g., GT-XXXXXX)')
+                .setRequired(true)),
     ].map(command => command.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(TOKEN);
 
     try {
-        console.log('Started refreshing application (/) commands.');
+        console.log('Refreshing application (/) commands...');
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
         console.log('Successfully reloaded application (/) commands.');
     } catch (error) {
@@ -73,11 +84,10 @@ client.on('ready', async () => {
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
-    const { commandName, user } = interaction;
+    const { commandName, user, options } = interaction;
 
     // --- /GEN COMMAND ---
     if (commandName === 'gen') {
-        // Defer reply immediately to handle database lag and keep it private (ephemeral)
         await interaction.deferReply({ ephemeral: true });
 
         const allData = await db.all();
@@ -85,16 +95,13 @@ client.on('interactionCreate', async (interaction) => {
             item.id.startsWith("key_") && item.value.ownerId === user.id
         );
 
-        // If they already have a key, just tell them what it is
         if (existingEntry) {
             const keyName = existingEntry.id.replace("key_", "");
             const status = existingEntry.value.hwid ? "Locked to a PC" : "Not yet used";
             return interaction.editReply(`**You already have a key!**\nKey: \`${keyName}\`\nStatus: \`${status}\``);
         }
 
-        // Otherwise, generate a new one
         const newKey = "GT-" + Math.random().toString(36).substring(2, 10).toUpperCase();
-        
         await db.set(`key_${newKey}`, { 
             hwid: null, 
             owner: user.tag,
@@ -104,24 +111,38 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply(`**Key Generated!**\nKey: \`${newKey}\`\n*This key is private and visible only to you.*`);
     }
 
+    // --- /DELETE COMMAND ---
+    if (commandName === 'delete') {
+        if (!AUTHORIZED_IDS.includes(user.id)) {
+            return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
+        }
+
+        const keyToDelete = options.getString('key');
+        const dbKey = `key_${keyToDelete}`;
+        
+        const exists = await db.get(dbKey);
+        if (!exists) {
+            return interaction.reply({ content: `❌ Key \`${keyToDelete}\` not found in database.`, ephemeral: true });
+        }
+
+        await db.delete(dbKey);
+        return interaction.reply({ content: `✅ Successfully deleted key: \`${keyToDelete}\``, ephemeral: true });
+    }
+
     // --- /RESET COMMAND ---
     if (commandName === 'reset') {
         if (!AUTHORIZED_IDS.includes(user.id)) {
-            return interaction.reply({ content: "❌ **Access Denied:** You are not authorized.", ephemeral: true });
+            return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
         }
 
         const allData = await db.all();
         const keysToDelete = allData.filter(item => item.id.startsWith("key_"));
 
-        if (keysToDelete.length === 0) {
-            return interaction.reply({ content: "The database is already empty.", ephemeral: true });
-        }
-
         for (const entry of keysToDelete) {
             await db.delete(entry.id);
         }
 
-        return interaction.reply({ content: `✅ **Success:** Deleted **${keysToDelete.length}** keys from the database.`, ephemeral: true });
+        return interaction.reply({ content: `✅ Deleted **${keysToDelete.length}** keys.`, ephemeral: true });
     }
 });
 
