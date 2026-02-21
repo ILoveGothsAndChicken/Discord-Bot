@@ -9,7 +9,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 const TOKEN = process.env.TOKEN;
-const AUTHORIZED_IDS = ["911401729868857434", "1223823990632747109"];
+const AUTHORIZED_IDS = ["911401729868857434"];
 const REQUIRED_ROLE_ID = "1340792386044956715";
 
 app.post('/verify', async (req, res) => {
@@ -153,4 +153,5 @@ client.on('interactionCreate', async (interaction) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on port ${PORT}`));
 client.login(TOKEN);
+
 
