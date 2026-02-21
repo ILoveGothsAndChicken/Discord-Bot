@@ -8,11 +8,11 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// --- CONFIGURATION ---
 const TOKEN = process.env.TOKEN;
 const AUTHORIZED_IDS = ["911401729868857434", "1223823990632747109"];
+const REQUIRED_ROLE_ID = "1340792386044956715";
+const ALLOWED_CHANNEL_ID = "1474566621644455938";
 
-// --- API FOR MOD MENU ---
 app.post('/verify', async (req, res) => {
     const { key, hwid } = req.body;
     
@@ -47,20 +47,18 @@ app.post('/verify', async (req, res) => {
     return res.send("HWID_MISMATCH");
 });
 
-// --- DISCORD BOT ---
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 client.on('ready', async () => {
     console.log(`Logged in as ${client.user.tag}`);
 
-    // Register Slash Commands
     const commands = [
         new SlashCommandBuilder()
             .setName('gen')
-            .setDescription('Generate your private HWID key'),
+            .setDescription('Generate your key'),
         new SlashCommandBuilder()
             .setName('reset')
-            .setDescription('Admin only: Clear all keys from database'),
+            .setDescription('Clear all keys from database'),
         new SlashCommandBuilder()
             .setName('delete')
             .setDescription('Admin only: Delete a specific key')
@@ -86,7 +84,6 @@ client.on('interactionCreate', async (interaction) => {
 
     const { commandName, user, options } = interaction;
 
-    // --- /GEN COMMAND ---
     if (commandName === 'gen') {
         await interaction.deferReply({ ephemeral: true });
 
@@ -111,7 +108,6 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply(`**Key Generated!**\nKey: \`${newKey}\`\n*This key is private and visible only to you.*`);
     }
 
-    // --- /DELETE COMMAND ---
     if (commandName === 'delete') {
         if (!AUTHORIZED_IDS.includes(user.id)) {
             return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
@@ -129,7 +125,6 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ content: `✅ Successfully deleted key: \`${keyToDelete}\``, ephemeral: true });
     }
 
-    // --- /RESET COMMAND ---
     if (commandName === 'reset') {
         if (!AUTHORIZED_IDS.includes(user.id)) {
             return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
