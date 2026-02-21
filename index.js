@@ -50,34 +50,40 @@ const client = new Client({
 });
 
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+    if (message.author.bot || !message.content.startsWith('!gen')) return;
 
-    if (message.content === '!gen') {
-        const userId = message.author.id;
+    const userId = message.author.id;
 
-        const allKeys = await db.all();
-        const existingKey = allKeys.find(item => 
-            item.id.startsWith("key_") && item.value.ownerId === userId
-        );
+    // 1. Fetch all data from the database
+    const allData = await db.all();
 
-        if (existingKey) {
-            const keyName = existingKey.id.replace("key_", "");
-            return message.reply(`**You already have a key!**\nKey: \`${keyName}\`\nStatus: ${existingKey.value.hwid ? "Locked to a PC" : "Not yet used"}`);
-        }
+    // 2. Check if any existing entry has this user's ID as the ownerId
+    const existingEntry = allData.find(item => 
+        item.id.startsWith("key_") && item.value.ownerId === userId
+    );
 
-        const newKey = "GT-" + Math.random().toString(36).substring(2, 10).toUpperCase();
+    // 3. IF FOUND: Send the existing key and STOP the function
+    if (existingEntry) {
+        const keyName = existingEntry.id.replace("key_", "");
+        const status = existingEntry.value.hwid ? "Locked to a PC" : "Not yet used";
         
-        await db.set(`key_${newKey}`, { 
-            hwid: null, 
-            owner: message.author.tag,
-            ownerId: userId
-        });
-
-        message.reply(`**Key Generated!**\nKey: \`${newKey}\`\n*This key will lock to the first computer that uses it.*`);
+        return message.reply(`**You already have a key!**\nKey: \`${keyName}\`\nStatus: \`${status}\``);
     }
+
+    // 4. IF NOT FOUND: Proceed to generate the new key
+    const newKey = "GT-" + Math.random().toString(36).substring(2, 10).toUpperCase();
+    
+    await db.set(`key_${newKey}`, { 
+        hwid: null, 
+        owner: message.author.tag,
+        ownerId: userId 
+    });
+
+    return message.reply(`**Key Generated!**\nKey: \`${newKey}\`\n*This key will lock to the first computer that uses it.*`);
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on port ${PORT}`));
 client.login(process.env.TOKEN);
+
 
