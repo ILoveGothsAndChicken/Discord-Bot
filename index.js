@@ -103,7 +103,6 @@ client.on('interactionCreate', async (interaction) => {
 
         if (existingEntry) {
             const keyName = existingEntry.id.replace("key_", "");
-            const status = existingEntry.value.hwid ? "Locked to a PC" : "Not yet used";
             return interaction.editReply(`**You already have a key!**\nKey: \`${keyName}\`\nStatus: \`${status}\``);
         }
 
@@ -153,6 +152,7 @@ client.on('interactionCreate', async (interaction) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on port ${PORT}`));
 client.login(TOKEN);
+
 
 
 
