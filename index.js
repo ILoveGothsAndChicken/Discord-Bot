@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
 const express = require('express');
 const { QuickDB } = require("quick.db");
 
@@ -12,11 +12,14 @@ const TOKEN = process.env.TOKEN;
 const AUTHORIZED_IDS = ["911401729868857434", "1223823990632747109"];
 const REQUIRED_ROLE_ID = "1340792386044956715";
 
-// --- EXPRESS API ---
+app.get('/', (req, res) => {
+    res.send("Running 24/7.");
+});
+
 app.post('/verify', async (req, res) => {
     const { key, hwid } = req.body;
     
-    if (!key || !hwid || hwid === "undefined") {
+    if (!key || !hwid || hwid === "undefined" || hwid.length < 5) {
         return res.send("INVALID_REQUEST"); 
     }
 
@@ -47,10 +50,8 @@ app.post('/verify', async (req, res) => {
     return res.send("HWID_MISMATCH");
 });
 
-// --- DISCORD BOT ---
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-// FIXED: Changed 'clientReady' to 'ready'
 client.on('ready', async () => {
     console.log(`Logged in as ${client.user.tag}`);
 
@@ -66,18 +67,17 @@ client.on('ready', async () => {
             .setDescription('Admin only: Delete a specific key')
             .addStringOption(option => 
                 option.setName('key')
-                .setDescription('The full key to delete (e.g., GT-XXXXXX)')
+                .setDescription('The full key to delete')
                 .setRequired(true)),
     ].map(command => command.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(TOKEN);
 
     try {
-        console.log('Refreshing application (/) commands...');
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log('Successfully reloaded application (/) commands.');
+        console.log('Commands registered.');
     } catch (error) {
-        console.error('Error registering commands:', error);
+        console.error(error);
     }
 });
 
@@ -85,16 +85,11 @@ client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName, user, options, member } = interaction;
-
-    // Check if user has the role or is an authorized admin
     const hasRole = member.roles.cache.has(REQUIRED_ROLE_ID);
     const isAuthorized = AUTHORIZED_IDS.includes(user.id);
 
     if (!hasRole && !isAuthorized) {
-        return interaction.reply({ 
-            content: "❌ **Access Denied:** You do not have the required role to use this bot.", 
-            ephemeral: true 
-        });
+        return interaction.reply({ content: "❌ Access Denied.", ephemeral: true });
     }
 
     if (commandName === 'gen') {
@@ -107,8 +102,7 @@ client.on('interactionCreate', async (interaction) => {
 
         if (existingEntry) {
             const keyName = existingEntry.id.replace("key_", "");
-            const status = existingEntry.value.hwid ? "Locked" : "Available";
-            return interaction.editReply(`**You already have a key!**\nKey: \`${keyName}\`\nStatus: \`${status}\``);
+            return interaction.editReply(`You already have a key: \`${keyName}\``);
         }
 
         const newKey = "GT-" + Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -121,45 +115,26 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply(`**Key Generated!**\nKey: \`${newKey}\``);
     }
 
-    if (commandName === 'delete') {
-        if (!isAuthorized) {
-            return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
+    if (commandName === 'delete' || commandName === 'reset') {
+        if (!isAuthorized) return interaction.reply({ content: "❌ Admin only.", ephemeral: true });
+
+        if (commandName === 'delete') {
+            const keyToDelete = options.getString('key');
+            await db.delete(`key_${keyToDelete}`);
+            return interaction.reply({ content: `Deleted \`${keyToDelete}\``, ephemeral: true });
         }
 
-        const keyToDelete = options.getString('key');
-        const dbKey = `key_${keyToDelete}`;
-        
-        const exists = await db.get(dbKey);
-        if (!exists) {
-            return interaction.reply({ content: `❌ Key \`${keyToDelete}\` not found in database.`, ephemeral: true });
+        if (commandName === 'reset') {
+            const allData = await db.all();
+            for (const entry of allData) {
+                if (entry.id.startsWith("key_")) await db.delete(entry.id);
+            }
+            return interaction.reply({ content: `Database cleared.`, ephemeral: true });
         }
-
-        await db.delete(dbKey);
-        return interaction.reply({ content: `✅ Successfully deleted key: \`${keyToDelete}\``, ephemeral: true });
-    }
-
-    if (commandName === 'reset') {
-        if (!isAuthorized) {
-            return interaction.reply({ content: "❌ **Access Denied.**", ephemeral: true });
-        }
-
-        const allData = await db.all();
-        const keysToDelete = allData.filter(item => item.id.startsWith("key_"));
-
-        for (const entry of keysToDelete) {
-            await db.delete(entry.id);
-        }
-
-        return interaction.reply({ content: `✅ Deleted **${keysToDelete.length}** keys.`, ephemeral: true });
     }
 });
-
-// Global error handling to prevent "Unhandled Error" crashes
-client.on('error', console.error);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on port ${PORT}`));
 
-client.login(TOKEN).catch(err => {
-    console.error("Failed to login to Discord:", err);
-});
+client.login(TOKEN);
